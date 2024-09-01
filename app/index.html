@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email OTP Extractor</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #spinner {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Your Netflix OTP Extractor</h1>
+        <form id="otpForm" class="form-inline justify-content-center">
+            <div class="form-group mb-2">
+                <label for="email" class="sr-only">Enter Email Address:</label>
+                <input type="email" class="form-control" id="email" name="email" placeholder="Enter your email" required>
+            </div>
+            <button type="submit" class="btn btn-primary mb-2 ml-2">Submit</button>
+        </form>
+        <div id="response" class="text-center mt-3"></div>
+        <div id="spinner" class="text-center mt-3">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">Processing...</span>
+            </div>
+            <p>Processing...</p>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+        document.getElementById("otpForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+            const email = document.getElementById("email").value;
+            const responseDiv = document.getElementById("response");
+            const spinner = document.getElementById("spinner");
+
+            // Clear previous responses and show spinner
+            responseDiv.innerHTML = "";
+            spinner.style.display = "block";
+
+            try {
+                const response = await fetch("/extract-otp", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    body: new URLSearchParams({ email: email })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    responseDiv.innerHTML = `<div class="alert alert-success"><strong>OTP:</strong> ${result.otp}</div>`;
+                } else {
+                    responseDiv.innerHTML = `<div class="alert alert-danger"><strong>Error:</strong> ${result.detail}</div>`;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `<div class="alert alert-danger"><strong>An error occurred:</strong> ${error.message}</div>`;
+            } finally {
+                // Hide the spinner once the response is received
+                spinner.style.display = "none";
+            }
+        });
+    </script>
+</body>
+</html>
