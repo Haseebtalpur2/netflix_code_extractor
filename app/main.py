@@ -50,22 +50,22 @@ def set_lock(status: bool):
 # Extract OTP based on the provided email
 @app.post("/extract-otp")
 async def extract_otp(email: str = Form(...)):
-    global lock_active
-    global lock_expiration_time
+    # global lock_active
+    # global lock_expiration_time
 
-    # Check if lock is active
-    if lock_active:
-        remaining_time = (lock_expiration_time - datetime.now()).seconds
-        if remaining_time > 0:
-            raise HTTPException(status_code=429, detail=f"Please wait {remaining_time // 60} minutes and {remaining_time % 60} seconds before trying again.")
-        else:
-            set_lock(False)  # Release the lock if the time has passed
+    # # Check if lock is active
+    # if lock_active:
+    #     remaining_time = (lock_expiration_time - datetime.now()).seconds
+    #     if remaining_time > 0:
+    #         raise HTTPException(status_code=429, detail=f"Please wait {remaining_time // 60} minutes and {remaining_time % 60} seconds before trying again.")
+    #     else:
+    #         set_lock(False)  # Release the lock if the time has passed
 
     # Set the lock
-    set_lock(True)
+    # set_lock(True)
 
     # Call the release_lock function to release the lock after 3 minutes
-    release_lock()
+    # release_lock()
     load_dotenv()
     # imap setup
     server = "outlook.office365.com"
