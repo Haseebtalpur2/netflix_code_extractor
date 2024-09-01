@@ -10,6 +10,13 @@
         #spinner {
             display: none;
         }
+        .rules {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
     </style>
 </head>
 <body>
@@ -28,6 +35,16 @@
                 <span class="sr-only">Processing...</span>
             </div>
             <p>Processing...</p>
+        </div>
+        <div class="rules">
+            <h4>Important Rules:</h4>
+            <ul>
+                <li>You can only get a temporary code here.</li>
+                <li>Updating Household isn't available right now.</li>
+                <li>If you want to update the household, contact the person who gave you the account.</li>
+                <li>Don't send multiple codes to one email at a time (It'll get mixed-up). First, send one code and let it be done. After that, share the second code.</li>
+                <li>If OTP is undefined, it means your OTP has expired, and you need to request it again from Netflix.</li>
+            </ul>
         </div>
     </div>
 
@@ -58,7 +75,11 @@
 
                 const result = await response.json();
                 if (response.ok) {
-                    responseDiv.innerHTML = `<div class="alert alert-success"><strong>OTP:</strong> ${result.otp}</div>`;
+                    if (result.otp) {
+                        responseDiv.innerHTML = `<div class="alert alert-success"><strong>OTP:</strong> ${result.otp}</div>`;
+                    } else {
+                        responseDiv.innerHTML = `<div class="alert alert-danger"><strong>Error:</strong> ${result.detail}</div>`;
+                    }
                 } else {
                     responseDiv.innerHTML = `<div class="alert alert-danger"><strong>Error:</strong> ${result.detail}</div>`;
                 }
