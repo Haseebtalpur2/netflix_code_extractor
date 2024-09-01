@@ -78,6 +78,8 @@ async def extract_otp(email: str = Form(...)):
     # Connect to the IMAP server & login
     mail = imaplib.IMAP4_SSL(server, port)
     try:
+        print(f"Username: {username}")
+        print(f"Password: {password}")
         mail.login(username, password)
     except imaplib.IMAP4.error as e:
         print(f"IMAP login failed: {e}")
