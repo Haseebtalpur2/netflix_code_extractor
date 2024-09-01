@@ -4,6 +4,7 @@ import imaplib
 import email as email_module  # Renaming the imported email module to avoid conflict
 from email.header import decode_header
 import re
+from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -65,16 +66,23 @@ async def extract_otp(email: str = Form(...)):
 
     # Call the release_lock function to release the lock after 3 minutes
     release_lock()
-
+    load_dotenv()
     # imap setup
     server = "outlook.office365.com"
     port = 993
-    username = "charmingtalpur@outlook.com"
-    password = "Thehash@@2"
+    username = os.getenv("IMAP_USERNAME")
+    password = os.getenv("IMAP_PASSWORD")
+
+
 
     # Connect to the IMAP server & login
     mail = imaplib.IMAP4_SSL(server, port)
-    mail.login(username, password)
+    try:
+        mail.login(username, password)
+    except imaplib.IMAP4.error as e:
+        print(f"IMAP login failed: {e}")
+        return {"error": "Login failed. Check server logs for details."}
+
     mail.select("inbox")
     search_criteria = f'(TO "{email}")'
     status, messages = mail.search(None, search_criteria)
