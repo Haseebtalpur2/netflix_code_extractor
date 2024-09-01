@@ -1,6 +1,4 @@
 fastapi
 uvicorn
 selenium
-imaplib
-email
 python-multipart
