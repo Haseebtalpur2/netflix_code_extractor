@@ -55,28 +55,57 @@
 
     <script>
         document.getElementById("otpForm").addEventListener("submit", async function(event) {
-            event.preventDefault();
+            event.preventDefault(); // Prevent form from submitting and reloading the page
+    
             const email = document.getElementById("email").value;
             const responseDiv = document.getElementById("response");
             const spinner = document.getElementById("spinner");
-
+    
             // Clear previous responses and show spinner
             responseDiv.innerHTML = "";
             spinner.style.display = "block";
-
+    
             try {
-                const response = await fetch("/extract-otp", {
+                const response = await fetch("http://localhost:8000/extract-otp", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/x-www-form-urlencoded"
                     },
                     body: new URLSearchParams({ email: email })
                 });
-
+    
                 const result = await response.json();
                 if (response.ok) {
                     if (result.otp) {
-                        responseDiv.innerHTML = `<div class="alert alert-success"><strong>OTP:</strong> ${result.otp}</div>`;
+                        responseDiv.innerHTML = `<div id="response" class="alert alert-success"><strong>OTP:</strong> ${result.otp}</div>`;
+                    } else if (result.button_html) {
+                        // Populate the Confirm update button in the response div
+                        responseDiv.innerHTML += `<div class="alert alert-info">
+                              <button style="background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                                ${result.button_html}
+                              </button>
+                            </div>`;
+
+                        
+                        // Attach event listener to the confirm button
+                        const confirmButton = document.getElementById('response');
+                        confirmButton.addEventListener('click', async function() {
+                            spinner.style.display = "block";
+                            // Call another FastAPI endpoint
+                            const confirmResponse = await fetch("http://localhost:8000/confirm-otp", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json"
+                                },
+                            });
+                            const confirmResult = await confirmResponse.json();
+                            spinner.style.display = "none";
+                            if (confirmResponse.ok) {
+                                responseDiv.innerHTML += `<div class="alert alert-success">${confirmResult.message}</div>`;
+                            } else {
+                                responseDiv.innerHTML += `<div class="alert alert-danger">${confirmResult.detail}</div>`;
+                            }
+                        });
                     } else {
                         responseDiv.innerHTML = `<div class="alert alert-danger"><strong>Error:</strong> ${result.detail}</div>`;
                     }
@@ -91,5 +120,7 @@
             }
         });
     </script>
+    
+    
 </body>
 </html>

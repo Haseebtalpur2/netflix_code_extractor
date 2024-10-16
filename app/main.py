@@ -1,176 +1,152 @@
-from fastapi import FastAPI, Form, HTTPException
-from fastapi.responses import HTMLResponse
-import imaplib
-import email as email_module  # Renaming the imported email module to avoid conflict
-from email.header import decode_header
+
+
 import re
-from dotenv import load_dotenv
+import os
+import threading
+from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import os
-
-from datetime import datetime, timedelta
-import threading
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from selenium.common.exceptions import TimeoutException
+from fastapi.middleware.cors import CORSMiddleware
+import pdb
 
 app = FastAPI()
 
-# Global lock and expiration time variables
+# Global lock variables
 lock_active = False
 lock_expiration_time = None
+get_code_url = None
 
-# Serve the HTML page
+# Function to release the lock after 3 minutes
+def release_lock():
+    global lock_active, lock_expiration_time
+    threading.Timer(180, lambda: set_lock(False)).start()
+
+# Function to set or unset the lock
+def set_lock(status: bool):
+    global lock_active, lock_expiration_time
+    lock_active = status
+    lock_expiration_time = datetime.now() + timedelta(minutes=0.5) if status else None
+
+# Route to serve the form HTML (optional)
 @app.get("/", response_class=HTMLResponse)
 async def get_form():
     file_path = os.path.join(os.path.dirname(__file__), "index.html")
     with open(file_path, "r") as file:
         return HTMLResponse(content=file.read(), status_code=200)
 
-# Function to release the lock
-def release_lock():
-    global lock_active
-    global lock_expiration_time
-
-    # Sleep for 3 minutes
-    threading.Timer(180, lambda: set_lock(False)).start()
-
-# Function to set or unset the lock
-def set_lock(status: bool):
-    global lock_active
-    global lock_expiration_time
-
-    lock_active = status
-    if status:
-        lock_expiration_time = datetime.now() + timedelta(minutes=3)
-    else:
-        lock_expiration_time = None
-
-# Extract OTP based on the provided email
+# Route to extract OTP from the fixed inbox
 @app.post("/extract-otp")
 async def extract_otp(email: str = Form(...)):
+    global get_code_url
+
     # global lock_active
-    # global lock_expiration_time
 
-    # # Check if lock is active
     # if lock_active:
-    #     remaining_time = (lock_expiration_time - datetime.now()).seconds
-    #     if remaining_time > 0:
-    #         raise HTTPException(status_code=429, detail=f"Please wait {remaining_time // 60} minutes and {remaining_time % 60} seconds before trying again.")
-    #     else:
-    #         set_lock(False)  # Release the lock if the time has passed
+    #     raise HTTPException(status_code=429, detail="Request is locked. Please try again later.")
 
-    # Set the lock
+    # # Set the lock
     # set_lock(True)
 
-    # Call the release_lock function to release the lock after 3 minutes
-    # release_lock()
-    load_dotenv()
-    # imap setup
-    server = "outlook.office365.com"
-    port = 993
-    username = os.getenv("IMAP_USERNAME")
-    password = os.getenv("IMAP_PASSWORD")
-
-
-
-    # Connect to the IMAP server & login
-    mail = imaplib.IMAP4_SSL(server, port)
     try:
-        print(f"Username: {username}")
-        print(f"Password: {password}")
-        mail.login(username, password)
-    except imaplib.IMAP4.error as e:
-        print(f"IMAP login failed: {e}")
-        return {"error": "Login failed. Check server logs for details."}
+        # Setup Selenium with headless Chrome
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
 
-    mail.select("inbox")
-    search_criteria = f'(TO "{email}")'
-    status, messages = mail.search(None, search_criteria)
+        driver = webdriver.Chrome(options=chrome_options)
+        # Access the fixed Maildrop inbox
+        inbox_url = "https://maildrop.cc/inbox/?mailbox=charmingqwerty"
+        driver.get(inbox_url)
+        # Find and click the "View Message" button
+        view_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, '//*[@id="gatsby-focus-wrapper"]/div/main/div/div[1]/div/div/div[2]/div[1]/div/div[2]/button[1]'))
+        )
+        view_button.click()
 
-    if status == "OK":
-        email_ids = messages[0].split()
-        print(f"Found {len(email_ids)} emails matching the criteria.")
-    else:
-        return {"error": "No emails found"}
+        # Get the page source and search for the email directly
+        source_code = driver.page_source
+        # email_to_check = email
+        # pattern = r'This message was mailed to\\s*<a[^>]+>\\[([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})\\]</a>\\s*by Netflix'
+        # matching_email = re.escape(email_to_check) 
+        pattern = r"https://www\.netflix\.com/account/travel/verify\?nftoken=[\S=]+"
+        match = re.search(pattern, source_code)
+        if not match:
+            raise HTTPException(status_code=404, detail="Code link not found")
 
-    # Fetch the latest email
-    latest_email_id = email_ids[-1]
-    status, msg_data = mail.fetch(latest_email_id, "(RFC822)")
+        get_code_url = match.group(0)
 
-    # Parse the email content
-    for response_part in msg_data:
-        if isinstance(response_part, tuple):
-            msg = email_module.message_from_bytes(response_part[1])
-            subject, encoding = decode_header(msg["Subject"])[0]
-            if isinstance(subject, bytes):
-                subject = subject.decode(encoding if encoding else 'utf-8')
-            print(f"Subject: {subject}")
+        # Navigate to the "Get Code" link to retrieve the OTP
+        # temporary link
+        # get_code_url = "file:///Users/dev/Downloads/Netflix1.htm"
+        driver.get(get_code_url)
+        otp_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "challenge-code"))
+        )
 
-            from_ = msg.get("From")
-            print(f"From: {from_}")
+        try:
+            # Attempt to find the OTP element
+            otp_element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "challenge-code"))
+            )
+            otp_code = otp_element.text
+            return {"otp": otp_code}
 
-            # Initialize a variable to store the email body
-            email_body = ""
+        except TimeoutException:
+            # If OTP element is not found, check for the Confirm update button using full XPath
+            try:
+                confirm_button = WebDriverWait(driver, 10).until(
+                    EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/div/div/div/div[2]/div/div/div/div[4]/button"))
+                )
+                # Return a message or HTML indicating the button is found
+                return {"message": "Confirm update button found", "button_html": confirm_button.get_attribute('outerHTML'), "get_code_url": get_code_url }
+            except TimeoutException:
+                return {"error": "Neither the challenge code nor the Confirm update button was found."}
 
-            # If the email message is multipart
-            if msg.is_multipart():
-                for part in msg.walk():
-                    content_type = part.get_content_type()
-                    content_disposition = str(part.get("Content-Disposition"))
+    except Exception as e:
+        return {"error": str(e)}
 
-                    try:
-                        # Extract the body content
-                        part_body = part.get_payload(decode=True).decode()
-                        email_body += part_body
-                    except Exception as e:
-                        pass
-            else:
-                # If it's a single-part email, directly get the body
-                content_type = msg.get_content_type()
-                email_body = msg.get_payload(decode=True).decode()
+    finally:
+        # Release the lock after completion
+        release_lock()
+        driver.quit()
 
-            # Extract URLs from the email body using regex
-            pattern = r'https://www\.netflix\.com/account/travel/verify\S*'
-            urls = re.findall(pattern, email_body)
 
-            # Check if there is a second URL and save it as important_url
-            important_url = urls[1] if len(urls) > 1 else None
-            #important_url = 'http://127.0.0.1:8000/file:///Users/dev/Documents/dev_projects/interview%20material/Devsinc%20Resumes/Netflix.html'
-            print(important_url)
-            if important_url:
-                # Set up Selenium in headless mode
-                chrome_options = Options()
-                chrome_options.add_argument("--headless")  # Run in headless mode
-                chrome_options.add_argument("--disable-gpu")  # Disable GPU acceleration (not necessary but good practice)
-                chrome_options.add_argument("--no-sandbox")  # Needed for running as root in some environments
-                chrome_options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
-
-                # Initialize the WebDriver
-                driver = webdriver.Chrome(options=chrome_options)
-
-                try:
-                    # Navigate to the URL
-                    driver.get(important_url)
-
-                    # Wait until the page loads and the element with the class "challenge-code" is found
-                    wait = WebDriverWait(driver, 5)  # Adjust the timeout as necessary
-                    otp_element = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "challenge-code")))
-
-                    # Extract the OTP from the element
-                    otp = otp_element.text
-                    print(f"The OTP is: {otp}")
-                    return {"otp": otp}
-
-                except Exception as e:
-                    print(f"An error occurred: {e}")
-                    return {"error": str(e)}
-
-                finally:
-                    driver.quit()  # Make sure to close the browser after the task is done
-
-            else:
-                return {"error": "Important URL not found in the email body."}
-
-    return {"error": "No valid OTP found"}
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Change this to specific origins in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+@app.post("/confirm-otp")
+async def confirm_otp():
+    global get_code_url
+    # Set up Selenium WebDriver
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(options=chrome_options)
+    # get_code_url = "file:///Users/dev/Downloads/Netflix1.htm"
+    driver.get(get_code_url)
+    # Wait for the confirm button and click it
+    try:
+        confirm_button = WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/div/div/div/div[2]/div/div/div/div[4]/button"))
+        )
+        confirm_button.click()
+        return {"message": "House Hold OTP confirmed successfully."}
+    except Exception as e:
+        return {"detail": str(e)}
+    finally:
+        get_code_url = None
+        driver.quit()
