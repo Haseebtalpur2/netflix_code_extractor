@@ -13,6 +13,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+import pdb
 app = FastAPI()
 
 # CORS Middleware
@@ -44,6 +45,7 @@ async def extract_otp(email: str = Form(...)):
     
     # Variables to store HTML response
     html_response = "<h2>Results:</h2>"
+    
     try:
         driver.get("https://maildrop.cc/inbox/?mailbox=charmingqwerty")
         time.sleep(2)
@@ -52,9 +54,9 @@ async def extract_otp(email: str = Form(...)):
         email_list = [email.text for email in emails]
         
         # Iterate through emails
-        for index, email in enumerate(emails, start=1):
+        for index, email_element in enumerate(emails, start=1):
             if index <= 4:
-                email.click()
+                email_element.click()
                 time.sleep(1)
                 
                 try:
@@ -64,9 +66,10 @@ async def extract_otp(email: str = Form(...)):
                     )
                     view_button.click()
                     source_code = driver.page_source
+                    
+                    # Search for the email within the page source code
                     email_match = re.search(re.escape(email), source_code)
                     
-                    # Check if client email is found
                     if email_match:
                         temp_pattern = r"https://www\.netflix\.com/account/travel/verify\?nftoken=[\S=]+"
                         hh_pattern = r"https://www\.netflix\.com/account/update-primary-location\?nftoken=[\S=]+"
@@ -112,12 +115,12 @@ async def extract_otp(email: str = Form(...)):
                             html_response += "<p>Email found, but neither a temporary code nor household update link.</p>"
                             break
                     else:
-                        html_response += f"<p>Email {index} is not your email, trying next...</p>"
+                        html_response += f"<p>Email {index} does not match the provided email, trying next...</p>"
                 except:
-                    html_response += "<p>Something went wrong, please try again with correct email or may be your code has been expired</p>"
+                    html_response += "<p>Something went wrong, please try again with correct email or maybe your code has expired.</p>"
                     break
             else:
-                html_response += "<p>Unable to find your email. Try sending a new email.</p>"
+                html_response += "<p>Unable to find a matching email. Try sending a new email.</p>"
                 break
     finally:
         driver.quit()
