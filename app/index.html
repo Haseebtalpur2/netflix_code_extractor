@@ -4,24 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Email OTP Extractor</title>
-    <!-- Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
         #spinner {
             display: none;
         }
-        .rules {
-            margin-top: 20px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: #f9f9f9;
-        }
     </style>
 </head>
 <body>
     <div class="container mt-5">
-        <h1 class="text-center mb-4">Your Netflix OTP Extractor</h1>
+        <h1 class="text-center mb-4">Netflix OTP Extractor</h1>
         <form id="otpForm" class="form-inline justify-content-center">
             <div class="form-group mb-2">
                 <label for="email" class="sr-only">Enter Email Address:</label>
@@ -29,14 +21,15 @@
             </div>
             <button type="submit" class="btn btn-primary mb-2 ml-2">Submit</button>
         </form>
-        <div id="response" class="text-center mt-3"></div>
         <div id="spinner" class="text-center mt-3">
             <div class="spinner-border text-primary" role="status">
-                <span class="sr-only">Processing...</span>
+                <span class="sr-only">Loading...</span>
             </div>
-            <p>Processing...</p>
         </div>
-        <div class="rules">
+        <div id="response" class="text-center mt-3"></div>
+
+        <!-- Adding the Rules Section Here -->
+        <div class="rules mt-5">
             <h4>Important Rules:</h4>
             <ul>
                 <li>You can only get a temporary code here.</li>
@@ -48,79 +41,21 @@
         </div>
     </div>
 
-    <!-- Bootstrap JS and dependencies -->
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-
     <script>
-        document.getElementById("otpForm").addEventListener("submit", async function(event) {
-            event.preventDefault(); // Prevent form from submitting and reloading the page
-    
-            const email = document.getElementById("email").value;
-            const responseDiv = document.getElementById("response");
-            const spinner = document.getElementById("spinner");
-    
-            // Clear previous responses and show spinner
-            responseDiv.innerHTML = "";
-            spinner.style.display = "block";
-    
-            try {
-                const response = await fetch("http://localhost:8000/extract-otp", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    },
-                    body: new URLSearchParams({ email: email })
-                });
-    
-                const result = await response.json();
-                if (response.ok) {
-                    if (result.otp) {
-                        responseDiv.innerHTML = `<div id="response" class="alert alert-success"><strong>OTP:</strong> ${result.otp}</div>`;
-                    } else if (result.button_html) {
-                        // Populate the Confirm update button in the response div
-                        responseDiv.innerHTML += `<div class="alert alert-info">
-                              <button style="background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
-                                ${result.button_html}
-                              </button>
-                            </div>`;
+        document.getElementById("otpForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            document.getElementById("spinner").style.display = "block";
+            document.getElementById("response").innerHTML = "";
 
-                        
-                        // Attach event listener to the confirm button
-                        const confirmButton = document.getElementById('response');
-                        confirmButton.addEventListener('click', async function() {
-                            spinner.style.display = "block";
-                            // Call another FastAPI endpoint
-                            const confirmResponse = await fetch("http://localhost:8000/confirm-otp", {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json"
-                                },
-                            });
-                            const confirmResult = await confirmResponse.json();
-                            spinner.style.display = "none";
-                            if (confirmResponse.ok) {
-                                responseDiv.innerHTML += `<div class="alert alert-success">${confirmResult.message}</div>`;
-                            } else {
-                                responseDiv.innerHTML += `<div class="alert alert-danger">${confirmResult.detail}</div>`;
-                            }
-                        });
-                    } else {
-                        responseDiv.innerHTML = `<div class="alert alert-danger"><strong>Error:</strong> ${result.detail}</div>`;
-                    }
-                } else {
-                    responseDiv.innerHTML = `<div class="alert alert-danger"><strong>Error:</strong> ${result.detail}</div>`;
-                }
-            } catch (error) {
-                responseDiv.innerHTML = `<div class="alert alert-danger"><strong>An error occurred:</strong> ${error.message}</div>`;
-            } finally {
-                // Hide the spinner once the response is received
-                spinner.style.display = "none";
-            }
+            const formData = new FormData(this);
+            const response = await fetch("/extract-otp", {
+                method: "POST",
+                body: formData,
+            });
+            const result = await response.text();
+            document.getElementById("spinner").style.display = "none";
+            document.getElementById("response").innerHTML = result;
         });
     </script>
-    
-    
 </body>
 </html>
