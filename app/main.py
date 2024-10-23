@@ -114,8 +114,6 @@ async def extract_otp(email: str = Form(...)):
                         else:
                             html_response += "<p>Email found, but neither a temporary code nor household update link.</p>"
                             break
-                    else:
-                        html_response += f"<p>Email {index} does not match the provided email, trying next...</p>"
                 except:
                     html_response += "<p>Something went wrong, please try again with correct email or maybe your code has expired.</p>"
                     break
